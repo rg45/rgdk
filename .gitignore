@@ -1,0 +1,13 @@
+/3rdParty/
+*.obj
+*.exe
+*.lib
+*.suo
+*.ilk
+*.log
+*.pch
+*.tlog
+*.idb
+*.pdb
+*.VC.db
+*.VC.opendb
