@@ -5,10 +5,11 @@
     <ThirdParty>$(SolutionDir)3rdParty</ThirdParty>
     <StlDir>$(ThirdParty)\STLport-5.2.1-patched\stlport</StlDir>
     <BoostDir>$(ThirdParty)\boost_1_58_0</BoostDir>
+    <GlfwDir>$(ThirdParty)\glfw</GlfwDir>
   </PropertyGroup>
   <PropertyGroup>
-    <IncludePath>$(BoostDir);$(StlDir)\stlport;$(IncludePath)</IncludePath>
-    <LibraryPath>$(BoostDir)\stage\lib;$(StlDir)\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(GlfwDir)\include;$(BoostDir);$(StlDir)\stlport;$(IncludePath)</IncludePath>
+    <LibraryPath>$(GlfwDir)\src\$(Configuration);$(BoostDir)\stage\lib;$(StlDir)\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -25,6 +26,9 @@
     </BuildMacro>
     <BuildMacro Include="BoostDir">
       <Value>$(BoostDir)</Value>
+    </BuildMacro>
+    <BuildMacro Include="GlfwDir">
+      <Value>$(GlfwDir)</Value>
     </BuildMacro>
   </ItemGroup>
 </Project>
