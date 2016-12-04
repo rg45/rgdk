@@ -15,7 +15,12 @@
     <ClCompile>
       <WarningLevel>EnableAllWarnings</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <PreprocessorDefinitions>NOT_IMPLEMENTED=(std::cout &lt;&lt; "[NOT IMPLEMENTED]: " __FUNCSIG__ &lt;&lt; std::endl);%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <Lib />
+    <Link>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <BuildMacro Include="ThirdParty">
