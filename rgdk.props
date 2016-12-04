@@ -8,7 +8,7 @@
     <GlfwDir>$(ThirdParty)\glfw</GlfwDir>
   </PropertyGroup>
   <PropertyGroup>
-    <IncludePath>$(GlfwDir)\include;$(BoostDir);$(StlDir)\stlport;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir);$(GlfwDir)\include;$(GlfwDir)\deps;$(BoostDir);$(StlDir)\stlport;$(IncludePath)</IncludePath>
     <LibraryPath>$(GlfwDir)\src\$(Configuration);$(BoostDir)\stage\lib;$(StlDir)\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup>
@@ -19,7 +19,7 @@
     </ClCompile>
     <Lib />
     <Link>
-      <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3.lib;opengl32.lib;glu32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

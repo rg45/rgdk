@@ -1,5 +1,6 @@
 /3rdParty/
 *.obj
+*.iobj
 *.exe
 *.lib
 *.suo
@@ -9,5 +10,6 @@
 *.tlog
 *.idb
 *.pdb
+*.ipdb
 *.VC.db
 *.VC.opendb
