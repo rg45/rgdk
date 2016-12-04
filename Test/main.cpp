@@ -11,6 +11,7 @@
 
 #include <cmath>
 #include <rgdk/math.hpp>
+#include <rgdk/scope_exit.hpp>
 
 /* Windows globals, defines, and prototypes */
 CHAR szAppName[] = "Win OpenGL";
@@ -19,12 +20,12 @@ HDC   ghDC;
 HGLRC ghRC;
 
 #define SWAPBUFFERS SwapBuffers(ghDC) 
-#define BLACK_INDEX     0 
-#define RED_INDEX       13 
-#define GREEN_INDEX     14 
-#define BLUE_INDEX      16 
-#define WIDTH           300 
-#define HEIGHT          200 
+#define BLACK_INDEX     0
+#define RED_INDEX       13
+#define GREEN_INDEX     14
+#define BLUE_INDEX      16
+#define WIDTH           800
+#define HEIGHT          600
 
 LONG WINAPI MainWndProc(HWND, UINT, WPARAM, LPARAM);
 BOOL bSetupPixelFormat(HDC);
@@ -298,8 +299,9 @@ GLvoid initializeGL(GLsizei width, GLsizei height)
 void polarView(GLdouble radius, GLdouble twist, GLdouble latitude, GLdouble longitude)
 {
    glTranslated(0.0, 0.0, -radius);
-   glRotated(-twist, 0.0, 0.0, 1.0);
-   glRotated(-latitude, 1.0, 0.0, 0.0);
+   glRotated(-90.f, 1.0, 0.0, 0.0);
+   glRotated(twist, 0.0, 0.0, 1.0);
+   glRotated(latitude, 1.0, 0.0, 0.0);
    glRotated(longitude, 0.0, 0.0, 1.0);
 }
 
@@ -308,10 +310,12 @@ GLvoid drawScene(DWORD msek)
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
    glPushMatrix();
+   rgdk::scope_exit restoreMatrix = glPopMatrix;
 
-   latitude = 90.f * std::sin(2 * rgdk::math::pi<float> * (msek % 7000) / 7000);
-   longitude = 360.f * (msek % 10000) / 10000;
-   GLfloat twist = 15; //360.f * (msek % 10000) / 10000;
+   //auto twist = 0; //360.f * (msek % 3000) / 3000; //15.f + 30.f * std::sin(2 * rgdk::math::pi<float> * (msek % 7000) / 7000);
+   auto twist = 360.f * (msek % 10000) / 10000;
+   auto latitude = 15.f + 30.f * std::sin(2 * rgdk::math::pi<float> * (msek % 7000) / 7000);
+   auto longitude = -360.f * (msek % 3000) / 3000;
 
    polarView(radius, twist, latitude, longitude);
 
@@ -322,13 +326,9 @@ GLvoid drawScene(DWORD msek)
    glCallList(GLOBE);
 
    glIndexi(GREEN_INDEX);
-   glPushMatrix();
    glTranslatef(0.8F, -0.65F, 0.0F);
    glRotatef(30.0F, 1.0F, 0.5F, 1.0F);
    glCallList(CYLINDER);
-   glPopMatrix();
-
-   glPopMatrix();
 
    SWAPBUFFERS;
 }
