@@ -118,11 +118,10 @@ LONG WINAPI MainWndProc(
    LPARAM  lParam)
 {
    LONG    lRet = 1;
-   PAINTSTRUCT    ps;
    RECT rect;
 
-   switch (uMsg) {
-
+   switch (uMsg)
+   {
    case WM_CREATE:
       ghDC = GetDC(hWnd);
       if (!bSetupPixelFormat(ghDC))
@@ -135,9 +134,12 @@ LONG WINAPI MainWndProc(
       break;
 
    case WM_PAINT:
+   {
+      PAINTSTRUCT ps;
       BeginPaint(hWnd, &ps);
       EndPaint(hWnd, &ps);
-      break;
+   }
+   break;
 
    case WM_SIZE:
       GetClientRect(hWnd, &rect);
@@ -165,20 +167,13 @@ LONG WINAPI MainWndProc(
       break;
 
    case WM_KEYDOWN:
-      switch (wParam) {
-      case VK_LEFT:
-         longinc += 0.5F;
-         break;
-      case VK_RIGHT:
-         longinc -= 0.5F;
-         break;
-      case VK_UP:
-         latinc += 0.5F;
-         break;
-      case VK_DOWN:
-         latinc -= 0.5F;
+      switch (wParam)
+      {
+      case VK_ESCAPE:
+         DestroyWindow(hWnd);
          break;
       }
+      break;
 
    default:
       lRet = LONG(DefWindowProc(hWnd, uMsg, wParam, lParam));
@@ -251,7 +246,7 @@ GLvoid createObjects()
 
    glNewList(CONE, GL_COMPILE);
    quadObj = gluNewQuadric();
-   gluQuadricDrawStyle(quadObj, GLU_FILL);
+   gluQuadricDrawStyle(quadObj, GLU_LINE);
    gluQuadricNormals(quadObj, GLU_SMOOTH);
    gluCylinder(quadObj, 0.3, 0.0, 0.6, 15, 10);
    glEndList();
@@ -261,9 +256,9 @@ GLvoid createObjects()
    glRotatef((GLfloat)90.0, (GLfloat)1.0, (GLfloat)0.0, (GLfloat)0.0);
    glTranslatef((GLfloat)0.0, (GLfloat)0.0, (GLfloat)-1.0);
    quadObj = gluNewQuadric();
-   gluQuadricDrawStyle(quadObj, GLU_FILL);
+   gluQuadricDrawStyle(quadObj, GLU_LINE);
    gluQuadricNormals(quadObj, GLU_SMOOTH);
-   gluCylinder(quadObj, 0.3, 0.3, 0.6, 12, 2);
+   gluCylinder(quadObj, 0.3, 0.3, 0.6, 12, 4);
    glPopMatrix();
    glEndList();
 }
@@ -319,13 +314,16 @@ GLvoid drawScene(DWORD msek)
 
    polarView(radius, twist, latitude, longitude);
 
-   glIndexi(RED_INDEX);
+   //glIndexi(RED_INDEX);
+   glColor3d(128, 0, 0);
    glCallList(CONE);
 
-   glIndexi(BLUE_INDEX);
+   //glIndexi(BLUE_INDEX);
+   glColor3d(0, 128, 0);
    glCallList(GLOBE);
 
-   glIndexi(GREEN_INDEX);
+   //glIndexi(GREEN_INDEX);
+   glColor3d(0, 0, 128);
    glTranslatef(0.8F, -0.65F, 0.0F);
    glRotatef(30.0F, 1.0F, 0.5F, 1.0F);
    glCallList(CYLINDER);
