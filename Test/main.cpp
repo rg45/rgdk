@@ -11,6 +11,8 @@
 #include <cmath>
 #include <iostream>
 
+namespace OpenGLTest
+{
 class OpenGLTestWindow
 {
 public:
@@ -24,6 +26,7 @@ public:
    , m_far_plane(7.0)
    , m_maxObjectSize(3.0)
    , m_radius(m_near_plane + m_maxObjectSize / 2.0)
+   , m_phase(rand())
    {
    }
 
@@ -34,7 +37,7 @@ public:
       CreateWindow(
          m_class_name.c_str(),
          "Generic OpenGL Sample",
-         WS_OVERLAPPED,
+         WS_OVERLAPPEDWINDOW,
          CW_USEDEFAULT,
          CW_USEDEFAULT,
          800,
@@ -50,6 +53,11 @@ public:
 
    GLvoid draw(DWORD msek)
    {
+      msek += m_phase;
+
+      wglMakeCurrent(m_hdc, m_hrc);
+      rgdk::scope_exit atExit = []() { wglMakeCurrent(nullptr, nullptr); };
+
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       glPushMatrix();
@@ -92,22 +100,14 @@ private:
    public:
       WindowClass()
       {
-         WNDCLASSEX wndclass { };
+         WNDCLASS wndclass { };
 
-         wndclass.cbSize = sizeof(WNDCLASSEX);
-         wndclass.style = 0;
          wndclass.lpfnWndProc = MainWndProc;
-         wndclass.cbClsExtra = 0;
-         wndclass.cbWndExtra = 0;
-         wndclass.hInstance = nullptr;
-         wndclass.hIcon = nullptr; //LoadIcon(nullptr, application_name);
          wndclass.hCursor = LoadCursor(nullptr, IDC_ARROW);
-         wndclass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-         wndclass.lpszMenuName = nullptr;
          wndclass.lpszClassName = m_class_name.c_str();
 
-         if (!RegisterClassEx(&wndclass))
-            throw std::exception();
+         if (!RegisterClass(&wndclass))
+            throw std::runtime_error("Could not register window class: '" + m_class_name + "'");
       }
 
       ~WindowClass()
@@ -157,7 +157,6 @@ private:
             PostQuitMessage(0);
 
          m_hrc = wglCreateContext(m_hdc);
-         wglMakeCurrent(m_hdc, m_hrc);
          GetClientRect(m_hWnd, &rect);
          initializeGL(rect.right, rect.bottom);
       }
@@ -230,10 +229,11 @@ private:
       return pixelformat && SetPixelFormat(hdc, pixelformat, &pfd);
    }
 
-   /* OpenGL code */
-
    GLvoid resize(GLsizei width, GLsizei height)
    {
+      wglMakeCurrent(m_hdc, m_hrc);
+      rgdk::scope_exit atExit = []() { wglMakeCurrent(nullptr, nullptr); };
+
       glViewport(0, 0, width, height);
       glMatrixMode(GL_PROJECTION);
       glLoadIdentity();
@@ -272,6 +272,9 @@ private:
 
    GLvoid initializeGL(GLsizei width, GLsizei height)
    {
+      wglMakeCurrent(m_hdc, m_hrc);
+      rgdk::scope_exit atExit = []() { wglMakeCurrent(nullptr, nullptr); };
+
       glClearColor(0.f, 0.f, 0.2f, 0);
       glClearDepth(1.0);
       glEnable(GL_DEPTH_TEST);
@@ -301,15 +304,16 @@ private:
    GLdouble m_far_plane;
    GLdouble m_maxObjectSize;
    GLdouble m_radius;
+   DWORD m_phase;
 };
 
 const std::string OpenGLTestWindow::m_class_name = rgdk::type_name<OpenGLTestWindow>();
 
-int main()
+void main()
 {
    PRINT(rgdk::type_name<OpenGLTestWindow>().c_str());
 
-   OpenGLTestWindow windows[1];
+   OpenGLTestWindow windows[5];
    for (auto&& window : windows)
    {
       window.create();
@@ -327,14 +331,31 @@ int main()
          }
          else
          {
-            return TRUE;
+            return;
          }
       }
       for (auto&& window : windows)
       {
          window.draw(GetTickCount());
       }
-      Sleep(5);
+      Sleep(2);
    }
 }
 
+} // namespace OpenGLTest
+
+int main()
+{
+   try
+   {
+      OpenGLTest::main();
+   }
+   catch (const std::exception& ex)
+   {
+      std::cout << "[std::exception]: " << ex.what() << std::endl;
+   }
+   catch (...)
+   {
+      std::cout << "[ERROR]: An unhandled exception of unknown type." << std::endl;
+   }
+}
