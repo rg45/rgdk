@@ -5,17 +5,18 @@
 * The OpenGL code is the same as that used in
 * the X Window System sample
 */
+#include <rgdk/math.hpp>
+#include <rgdk/scope_exit.hpp>
+
 #include <windows.h> 
 #include <GL/gl.h> 
 #include <GL/glu.h> 
 
 #include <cmath>
-#include <rgdk/math.hpp>
-#include <rgdk/scope_exit.hpp>
+#include <iostream>
 
 /* Windows globals, defines, and prototypes */
 CHAR szAppName[] = "Win OpenGL";
-HWND  ghWnd;
 HDC   ghDC;
 HGLRC ghRC;
 
@@ -27,7 +28,7 @@ HGLRC ghRC;
 #define WIDTH           800
 #define HEIGHT          600
 
-LONG WINAPI MainWndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT WINAPI MainWndProc(HWND, UINT, WPARAM, LPARAM);
 BOOL bSetupPixelFormat(HDC);
 
 /* OpenGL globals, defines, and prototypes */
@@ -43,179 +44,204 @@ GLvoid initializeGL(GLsizei, GLsizei);
 GLvoid drawScene(DWORD);
 void polarView(GLdouble, GLdouble, GLdouble, GLdouble);
 
-//int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+class OpenGLTestWindow
+{
+   HWND m_hWnd;
+public:
+
+   OpenGLTestWindow() : m_hWnd() { }
+
+   void Create()
+   {
+      static WindowClass windowClass;
+
+      CreateWindow(
+         szAppName,
+         "Generic OpenGL Sample",
+         WS_OVERLAPPED,
+         CW_USEDEFAULT,
+         CW_USEDEFAULT,
+         WIDTH,
+         HEIGHT,
+         NULL,
+         NULL,
+         NULL,
+         this);
+
+      ShowWindow(m_hWnd, SW_SHOWNORMAL);
+      UpdateWindow(m_hWnd);
+   }
+
+private:
+
+   class WindowClass
+   {
+   public:
+      WindowClass()
+      {
+         WNDCLASSEX wndclass{};
+
+         wndclass.cbSize = sizeof(WNDCLASSEX);
+         wndclass.style = 0;
+         wndclass.lpfnWndProc = MainWndProc;
+         wndclass.cbClsExtra = 0;
+         wndclass.cbWndExtra = 0;
+         wndclass.hInstance = NULL;
+         wndclass.hIcon = LoadIcon(NULL, szAppName);
+         wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
+         wndclass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+         wndclass.lpszMenuName = szAppName;
+         wndclass.lpszClassName = szAppName;
+
+         if (!RegisterClassEx(&wndclass))
+            throw std::exception();
+      }
+
+      ~WindowClass()
+      {
+         std::cout << "Unregistering class: " << szAppName << std::endl;
+         UnregisterClass(szAppName, NULL);
+      }
+   };
+
+   static LRESULT WINAPI MainWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+   {
+      auto onCreate = [](HWND hWnd, const CREATESTRUCT& createStruct)
+      {
+         auto window = reinterpret_cast<OpenGLTestWindow*>(createStruct.lpCreateParams);
+         window->m_hWnd = hWnd;
+         SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
+         return window;
+      };
+      auto window = uMsg == WM_CREATE ?
+         onCreate(hWnd, *reinterpret_cast<const CREATESTRUCT*>(lParam)) :
+         reinterpret_cast<OpenGLTestWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+      std::cout << "msg: " << uMsg << " window: " << window << std::endl;
+
+      auto result = window ?
+         window->WindowProc(uMsg, wParam, lParam) :
+         DefWindowProc(hWnd, uMsg, wParam, lParam);
+
+      if (uMsg == WM_DESTROY)
+      {
+         SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(nullptr));
+      }
+      return result;
+   }
+
+   virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+   {
+      LRESULT result = true;
+      RECT rect;
+
+      switch (uMsg)
+      {
+      case WM_CREATE:
+      {
+         ghDC = GetDC(m_hWnd);
+         if (!bSetupPixelFormat(ghDC))
+            PostQuitMessage(0);
+
+         ghRC = wglCreateContext(ghDC);
+         wglMakeCurrent(ghDC, ghRC);
+         GetClientRect(m_hWnd, &rect);
+         initializeGL(rect.right, rect.bottom);
+      }
+      break;
+
+      case WM_PAINT:
+      {
+         PAINTSTRUCT ps;
+         BeginPaint(m_hWnd, &ps);
+         EndPaint(m_hWnd, &ps);
+      }
+      break;
+
+      case WM_SIZE:
+         GetClientRect(m_hWnd, &rect);
+         resize(rect.right, rect.bottom);
+         break;
+
+      case WM_CLOSE:
+         if (ghRC)
+            wglDeleteContext(ghRC);
+         if (ghDC)
+            ReleaseDC(m_hWnd, ghDC);
+         ghRC = 0;
+         ghDC = 0;
+
+         DestroyWindow(m_hWnd);
+         break;
+
+      case WM_DESTROY:
+         if (ghRC)
+            wglDeleteContext(ghRC);
+         if (ghDC)
+            ReleaseDC(m_hWnd, ghDC);
+
+         PostQuitMessage(0);
+         break;
+
+      case WM_KEYDOWN:
+         switch (wParam)
+         {
+         case VK_ESCAPE:
+            DestroyWindow(m_hWnd);
+            break;
+         }
+         break;
+
+      default:
+         result = DefWindowProc(m_hWnd, uMsg, wParam, lParam);
+         break;
+      }
+      return result;
+   }
+
+};
+
 int main()
 {
-   HINSTANCE hInstance = NULL;
-   int nCmdShow = SW_SHOWNORMAL;
-   MSG        msg;
-   WNDCLASS   wndclass;
+   OpenGLTestWindow window;
+   window.Create();
 
-   /* Register the frame class */
-   wndclass.style = 0;
-   wndclass.lpfnWndProc = (WNDPROC)MainWndProc;
-   wndclass.cbClsExtra = 0;
-   wndclass.cbWndExtra = 0;
-   wndclass.hInstance = hInstance;
-   wndclass.hIcon = LoadIcon(hInstance, szAppName);
-   wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
-   wndclass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-   wndclass.lpszMenuName = szAppName;
-   wndclass.lpszClassName = szAppName;
-
-   if (!RegisterClass(&wndclass))
-      return FALSE;
-
-   /* Create the frame */
-   ghWnd = CreateWindow(szAppName,
-      "Generic OpenGL Sample",
-      WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-      CW_USEDEFAULT,
-      CW_USEDEFAULT,
-      WIDTH,
-      HEIGHT,
-      NULL,
-      NULL,
-      hInstance,
-      NULL);
-
-   /* make sure window was created */
-   if (!ghWnd)
-      return FALSE;
-
-   /* show and update main window */
-   ShowWindow(ghWnd, nCmdShow);
-
-   UpdateWindow(ghWnd);
-
-   /* animation loop */
    for (;;)
    {
-      /*
-      *  Process all pending messages
-      */
-
-      while (PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE) == TRUE)
+      MSG msg { };
+      while (PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE))
       {
          if (GetMessage(&msg, NULL, 0, 0))
          {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
          }
-         else {
+         else
+         {
             return TRUE;
          }
       }
       drawScene(GetTickCount());
+      Sleep(5);
    }
-}
-
-/* main window procedure */
-LONG WINAPI MainWndProc(
-   HWND    hWnd,
-   UINT    uMsg,
-   WPARAM  wParam,
-   LPARAM  lParam)
-{
-   LONG    lRet = 1;
-   RECT rect;
-
-   switch (uMsg)
-   {
-   case WM_CREATE:
-      ghDC = GetDC(hWnd);
-      if (!bSetupPixelFormat(ghDC))
-         PostQuitMessage(0);
-
-      ghRC = wglCreateContext(ghDC);
-      wglMakeCurrent(ghDC, ghRC);
-      GetClientRect(hWnd, &rect);
-      initializeGL(rect.right, rect.bottom);
-      break;
-
-   case WM_PAINT:
-   {
-      PAINTSTRUCT ps;
-      BeginPaint(hWnd, &ps);
-      EndPaint(hWnd, &ps);
-   }
-   break;
-
-   case WM_SIZE:
-      GetClientRect(hWnd, &rect);
-      resize(rect.right, rect.bottom);
-      break;
-
-   case WM_CLOSE:
-      if (ghRC)
-         wglDeleteContext(ghRC);
-      if (ghDC)
-         ReleaseDC(hWnd, ghDC);
-      ghRC = 0;
-      ghDC = 0;
-
-      DestroyWindow(hWnd);
-      break;
-
-   case WM_DESTROY:
-      if (ghRC)
-         wglDeleteContext(ghRC);
-      if (ghDC)
-         ReleaseDC(hWnd, ghDC);
-
-      PostQuitMessage(0);
-      break;
-
-   case WM_KEYDOWN:
-      switch (wParam)
-      {
-      case VK_ESCAPE:
-         DestroyWindow(hWnd);
-         break;
-      }
-      break;
-
-   default:
-      lRet = LONG(DefWindowProc(hWnd, uMsg, wParam, lParam));
-      break;
-   }
-
-   return lRet;
 }
 
 BOOL bSetupPixelFormat(HDC hdc)
 {
-   PIXELFORMATDESCRIPTOR pfd, *ppfd;
-   int pixelformat;
+   PIXELFORMATDESCRIPTOR pfd;
+   pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+   pfd.nVersion = 1;
+   pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+   pfd.dwLayerMask = PFD_MAIN_PLANE;
+   pfd.iPixelType = PFD_TYPE_COLORINDEX;
+   pfd.cColorBits = 8;
+   pfd.cDepthBits = 16;
+   pfd.cAccumBits = 0;
+   pfd.cStencilBits = 0;
 
-   ppfd = &pfd;
+   const int pixelformat = ChoosePixelFormat(hdc, &pfd);
 
-   ppfd->nSize = sizeof(PIXELFORMATDESCRIPTOR);
-   ppfd->nVersion = 1;
-   ppfd->dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL |
-      PFD_DOUBLEBUFFER;
-   ppfd->dwLayerMask = PFD_MAIN_PLANE;
-   ppfd->iPixelType = PFD_TYPE_COLORINDEX;
-   ppfd->cColorBits = 8;
-   ppfd->cDepthBits = 16;
-   ppfd->cAccumBits = 0;
-   ppfd->cStencilBits = 0;
-
-   pixelformat = ChoosePixelFormat(hdc, ppfd);
-
-   if ((pixelformat = ChoosePixelFormat(hdc, ppfd)) == 0)
-   {
-      MessageBox(NULL, "ChoosePixelFormat failed", "Error", MB_OK);
-      return FALSE;
-   }
-
-   if (SetPixelFormat(hdc, pixelformat, ppfd) == FALSE)
-   {
-      MessageBox(NULL, "SetPixelFormat failed", "Error", MB_OK);
-      return FALSE;
-   }
-
-   return TRUE;
+   return pixelformat && SetPixelFormat(hdc, pixelformat, &pfd);
 }
 
 /* OpenGL code */
@@ -315,15 +341,15 @@ GLvoid drawScene(DWORD msek)
    polarView(radius, twist, latitude, longitude);
 
    //glIndexi(RED_INDEX);
-   glColor3d(128, 0, 0);
+   glColor3ub(255, 127, 0);
    glCallList(CONE);
 
    //glIndexi(BLUE_INDEX);
-   glColor3d(0, 128, 0);
+   glColor3ub(0, 255, 127);
    glCallList(GLOBE);
 
    //glIndexi(GREEN_INDEX);
-   glColor3d(0, 0, 128);
+   glColor3ub(255, 0, 127);
    glTranslatef(0.8F, -0.65F, 0.0F);
    glRotatef(30.0F, 1.0F, 0.5F, 1.0F);
    glCallList(CYLINDER);
