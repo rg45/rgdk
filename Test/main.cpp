@@ -1,10 +1,5 @@
 #include "stdafx.h"
 
-/*
-* Example of a Windows OpenGL program.
-* The OpenGL code is the same as that used in
-* the X Window System sample
-*/
 #include <rgdk/math.hpp>
 #include <rgdk/scope_exit.hpp>
 
@@ -15,54 +10,36 @@
 #include <cmath>
 #include <iostream>
 
-/* Windows globals, defines, and prototypes */
-CHAR szAppName[] = "Win OpenGL";
-HDC   ghDC;
-HGLRC ghRC;
-
-#define SWAPBUFFERS SwapBuffers(ghDC) 
-#define BLACK_INDEX     0
-#define RED_INDEX       13
-#define GREEN_INDEX     14
-#define BLUE_INDEX      16
-#define WIDTH           800
-#define HEIGHT          600
-
-LRESULT WINAPI MainWndProc(HWND, UINT, WPARAM, LPARAM);
-BOOL bSetupPixelFormat(HDC);
-
-/* OpenGL globals, defines, and prototypes */
-GLfloat latitude, longitude, latinc, longinc;
-GLdouble radius;
-
-#define GLOBE    1 
-#define CYLINDER 2 
-#define CONE     3 
-
-GLvoid resize(GLsizei, GLsizei);
-GLvoid initializeGL(GLsizei, GLsizei);
-GLvoid drawScene(DWORD);
-void polarView(GLdouble, GLdouble, GLdouble, GLdouble);
+const char* const application_name = "Win OpenGL";
 
 class OpenGLTestWindow
 {
-   HWND m_hWnd;
 public:
 
-   OpenGLTestWindow() : m_hWnd() { }
+   OpenGLTestWindow()
+   : m_hWnd()
+   , m_hdc()
+   , m_hrc()
+   , m_fov(45.0)
+   , m_near_plane(3.0)
+   , m_far_plane(7.0)
+   , m_maxObjectSize(3.0)
+   , m_radius(m_near_plane + m_maxObjectSize / 2.0)
+   {
+   }
 
-   void Create()
+   void create()
    {
       static WindowClass windowClass;
 
       CreateWindow(
-         szAppName,
+         application_name,
          "Generic OpenGL Sample",
          WS_OVERLAPPED,
          CW_USEDEFAULT,
          CW_USEDEFAULT,
-         WIDTH,
-         HEIGHT,
+         800,
+         600,
          NULL,
          NULL,
          NULL,
@@ -72,7 +49,44 @@ public:
       UpdateWindow(m_hWnd);
    }
 
+   GLvoid draw(DWORD msek)
+   {
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      glPushMatrix();
+      rgdk::scope_exit restoreMatrix = glPopMatrix;
+
+      auto twist = 360.f * (msek % 10000) / 10000;
+      auto latitude = 15.f + 30.f * std::sin(2 * rgdk::math::pi<float> * (msek % 7000) / 7000);
+      auto longitude = -360.f * (msek % 3000) / 3000;
+
+      polarView(twist, latitude, longitude);
+
+      //glIndexi(RED_INDEX);
+      glColor3ub(255, 127, 0);
+      glCallList(GLuint(PrimitiveIndex::CONE));
+
+      //glIndexi(BLUE_INDEX);
+      glColor3ub(0, 255, 127);
+      glCallList(GLuint(PrimitiveIndex::GLOBE));
+
+      //glIndexi(GREEN_INDEX);
+      glColor3ub(255, 0, 127);
+      glTranslatef(0.8F, -0.65F, 0.0F);
+      glRotatef(30.0F, 1.0F, 0.5F, 1.0F);
+      glCallList(GLuint(PrimitiveIndex::CYLINDER));
+
+      SwapBuffers(m_hdc);
+   }
+
 private:
+
+   enum class PrimitiveIndex : GLuint
+   {
+      GLOBE = 1,
+      CYLINDER = 2,
+      CONE = 3
+   };
 
    class WindowClass
    {
@@ -87,11 +101,11 @@ private:
          wndclass.cbClsExtra = 0;
          wndclass.cbWndExtra = 0;
          wndclass.hInstance = NULL;
-         wndclass.hIcon = LoadIcon(NULL, szAppName);
+         wndclass.hIcon = LoadIcon(NULL, application_name);
          wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
          wndclass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-         wndclass.lpszMenuName = szAppName;
-         wndclass.lpszClassName = szAppName;
+         wndclass.lpszMenuName = application_name;
+         wndclass.lpszClassName = application_name;
 
          if (!RegisterClassEx(&wndclass))
             throw std::exception();
@@ -99,8 +113,8 @@ private:
 
       ~WindowClass()
       {
-         std::cout << "Unregistering class: " << szAppName << std::endl;
-         UnregisterClass(szAppName, NULL);
+         std::cout << "Unregistering class: " << application_name << std::endl;
+         UnregisterClass(application_name, NULL);
       }
    };
 
@@ -139,12 +153,12 @@ private:
       {
       case WM_CREATE:
       {
-         ghDC = GetDC(m_hWnd);
-         if (!bSetupPixelFormat(ghDC))
+         m_hdc = GetDC(m_hWnd);
+         if (!bSetupPixelFormat(m_hdc))
             PostQuitMessage(0);
 
-         ghRC = wglCreateContext(ghDC);
-         wglMakeCurrent(ghDC, ghRC);
+         m_hrc = wglCreateContext(m_hdc);
+         wglMakeCurrent(m_hdc, m_hrc);
          GetClientRect(m_hWnd, &rect);
          initializeGL(rect.right, rect.bottom);
       }
@@ -164,21 +178,21 @@ private:
          break;
 
       case WM_CLOSE:
-         if (ghRC)
-            wglDeleteContext(ghRC);
-         if (ghDC)
-            ReleaseDC(m_hWnd, ghDC);
-         ghRC = 0;
-         ghDC = 0;
+         if (m_hrc)
+            wglDeleteContext(m_hrc);
+         if (m_hdc)
+            ReleaseDC(m_hWnd, m_hdc);
+         m_hrc = 0;
+         m_hdc = 0;
 
          DestroyWindow(m_hWnd);
          break;
 
       case WM_DESTROY:
-         if (ghRC)
-            wglDeleteContext(ghRC);
-         if (ghDC)
-            ReleaseDC(m_hWnd, ghDC);
+         if (m_hrc)
+            wglDeleteContext(m_hrc);
+         if (m_hdc)
+            ReleaseDC(m_hWnd, m_hdc);
 
          PostQuitMessage(0);
          break;
@@ -199,16 +213,103 @@ private:
       return result;
    }
 
+   BOOL bSetupPixelFormat(HDC hdc)
+   {
+      PIXELFORMATDESCRIPTOR pfd;
+      pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+      pfd.nVersion = 1;
+      pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+      pfd.dwLayerMask = PFD_MAIN_PLANE;
+      pfd.iPixelType = PFD_TYPE_COLORINDEX;
+      pfd.cColorBits = 8;
+      pfd.cDepthBits = 16;
+      pfd.cAccumBits = 0;
+      pfd.cStencilBits = 0;
+
+      const int pixelformat = ChoosePixelFormat(hdc, &pfd);
+
+      return pixelformat && SetPixelFormat(hdc, pixelformat, &pfd);
+   }
+
+   /* OpenGL code */
+
+   GLvoid resize(GLsizei width, GLsizei height)
+   {
+      glViewport(0, 0, width, height);
+      glMatrixMode(GL_PROJECTION);
+      glLoadIdentity();
+      gluPerspective(m_fov, GLfloat(width) / height, m_near_plane, m_far_plane);
+      glMatrixMode(GL_MODELVIEW);
+   }
+
+   GLvoid createObjects()
+   {
+      GLUquadricObj *quadObj;
+
+      glNewList(GLuint(PrimitiveIndex::GLOBE), GL_COMPILE);
+      quadObj = gluNewQuadric();
+      gluQuadricDrawStyle(quadObj, GLU_LINE);
+      gluSphere(quadObj, 1.5, 16, 16);
+      glEndList();
+
+      glNewList(GLuint(PrimitiveIndex::CONE), GL_COMPILE);
+      quadObj = gluNewQuadric();
+      gluQuadricDrawStyle(quadObj, GLU_LINE);
+      gluQuadricNormals(quadObj, GLU_SMOOTH);
+      gluCylinder(quadObj, 0.3, 0.0, 0.6, 15, 10);
+      glEndList();
+
+      glNewList(GLuint(PrimitiveIndex::CYLINDER), GL_COMPILE);
+      glPushMatrix();
+      glRotatef((GLfloat)90.0, (GLfloat)1.0, (GLfloat)0.0, (GLfloat)0.0);
+      glTranslatef((GLfloat)0.0, (GLfloat)0.0, (GLfloat)-1.0);
+      quadObj = gluNewQuadric();
+      gluQuadricDrawStyle(quadObj, GLU_LINE);
+      gluQuadricNormals(quadObj, GLU_SMOOTH);
+      gluCylinder(quadObj, 0.3, 0.3, 0.6, 12, 4);
+      glPopMatrix();
+      glEndList();
+   }
+
+   GLvoid initializeGL(GLsizei width, GLsizei height)
+   {
+      glClearColor(0.f, 0.f, 0.2f, 0);
+      glClearDepth(1.0);
+      glEnable(GL_DEPTH_TEST);
+      glMatrixMode(GL_PROJECTION);
+      gluPerspective(m_fov, GLdouble(width) / height, m_near_plane, m_far_plane);
+      glMatrixMode(GL_MODELVIEW);
+      createObjects();
+   }
+
+   void polarView(GLdouble twist, GLdouble latitude, GLdouble longitude)
+   {
+      glTranslated(0.0, 0.0, -m_radius);
+      glRotated(-90.f, 1.0, 0.0, 0.0);
+      glRotated(twist, 0.0, 0.0, 1.0);
+      glRotated(latitude, 1.0, 0.0, 0.0);
+      glRotated(longitude, 0.0, 0.0, 1.0);
+   }
+
+private:
+   HWND m_hWnd;
+   HDC   m_hdc;
+   HGLRC m_hrc;
+   GLdouble m_fov;
+   GLdouble m_near_plane;
+   GLdouble m_far_plane;
+   GLdouble m_maxObjectSize;
+   GLdouble m_radius;
 };
 
 int main()
 {
    OpenGLTestWindow window;
-   window.Create();
+   window.create();
 
    for (;;)
    {
-      MSG msg { };
+      MSG msg{};
       while (PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE))
       {
          if (GetMessage(&msg, NULL, 0, 0))
@@ -221,138 +322,8 @@ int main()
             return TRUE;
          }
       }
-      drawScene(GetTickCount());
+      window.draw(GetTickCount());
       Sleep(5);
    }
 }
 
-BOOL bSetupPixelFormat(HDC hdc)
-{
-   PIXELFORMATDESCRIPTOR pfd;
-   pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-   pfd.nVersion = 1;
-   pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-   pfd.dwLayerMask = PFD_MAIN_PLANE;
-   pfd.iPixelType = PFD_TYPE_COLORINDEX;
-   pfd.cColorBits = 8;
-   pfd.cDepthBits = 16;
-   pfd.cAccumBits = 0;
-   pfd.cStencilBits = 0;
-
-   const int pixelformat = ChoosePixelFormat(hdc, &pfd);
-
-   return pixelformat && SetPixelFormat(hdc, pixelformat, &pfd);
-}
-
-/* OpenGL code */
-
-GLvoid resize(GLsizei width, GLsizei height)
-{
-   GLfloat aspect;
-
-   glViewport(0, 0, width, height);
-
-   aspect = (GLfloat)width / height;
-
-   glMatrixMode(GL_PROJECTION);
-   glLoadIdentity();
-   gluPerspective(45.0, aspect, 3.0, 7.0);
-   glMatrixMode(GL_MODELVIEW);
-}
-
-GLvoid createObjects()
-{
-   GLUquadricObj *quadObj;
-
-   glNewList(GLOBE, GL_COMPILE);
-   quadObj = gluNewQuadric();
-   gluQuadricDrawStyle(quadObj, GLU_LINE);
-   gluSphere(quadObj, 1.5, 16, 16);
-   glEndList();
-
-   glNewList(CONE, GL_COMPILE);
-   quadObj = gluNewQuadric();
-   gluQuadricDrawStyle(quadObj, GLU_LINE);
-   gluQuadricNormals(quadObj, GLU_SMOOTH);
-   gluCylinder(quadObj, 0.3, 0.0, 0.6, 15, 10);
-   glEndList();
-
-   glNewList(CYLINDER, GL_COMPILE);
-   glPushMatrix();
-   glRotatef((GLfloat)90.0, (GLfloat)1.0, (GLfloat)0.0, (GLfloat)0.0);
-   glTranslatef((GLfloat)0.0, (GLfloat)0.0, (GLfloat)-1.0);
-   quadObj = gluNewQuadric();
-   gluQuadricDrawStyle(quadObj, GLU_LINE);
-   gluQuadricNormals(quadObj, GLU_SMOOTH);
-   gluCylinder(quadObj, 0.3, 0.3, 0.6, 12, 4);
-   glPopMatrix();
-   glEndList();
-}
-
-GLvoid initializeGL(GLsizei width, GLsizei height)
-{
-   GLfloat     maxObjectSize, aspect;
-   GLdouble    near_plane, far_plane;
-
-   glClearIndex((GLfloat)BLACK_INDEX);
-   glClearDepth(1.0);
-
-   glEnable(GL_DEPTH_TEST);
-
-   glMatrixMode(GL_PROJECTION);
-   aspect = (GLfloat)width / height;
-   gluPerspective(45.0, aspect, 3.0, 7.0);
-   glMatrixMode(GL_MODELVIEW);
-
-   near_plane = 3.0;
-   far_plane = 7.0;
-   maxObjectSize = 3.0F;
-   radius = near_plane + maxObjectSize / 2.0;
-
-   latitude = 0.0F;
-   longitude = 0.0F;
-   latinc = 6.0F;
-   longinc = 2.5F;
-
-   createObjects();
-}
-
-void polarView(GLdouble radius, GLdouble twist, GLdouble latitude, GLdouble longitude)
-{
-   glTranslated(0.0, 0.0, -radius);
-   glRotated(-90.f, 1.0, 0.0, 0.0);
-   glRotated(twist, 0.0, 0.0, 1.0);
-   glRotated(latitude, 1.0, 0.0, 0.0);
-   glRotated(longitude, 0.0, 0.0, 1.0);
-}
-
-GLvoid drawScene(DWORD msek)
-{
-   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-   glPushMatrix();
-   rgdk::scope_exit restoreMatrix = glPopMatrix;
-
-   //auto twist = 0; //360.f * (msek % 3000) / 3000; //15.f + 30.f * std::sin(2 * rgdk::math::pi<float> * (msek % 7000) / 7000);
-   auto twist = 360.f * (msek % 10000) / 10000;
-   auto latitude = 15.f + 30.f * std::sin(2 * rgdk::math::pi<float> * (msek % 7000) / 7000);
-   auto longitude = -360.f * (msek % 3000) / 3000;
-
-   polarView(radius, twist, latitude, longitude);
-
-   //glIndexi(RED_INDEX);
-   glColor3ub(255, 127, 0);
-   glCallList(CONE);
-
-   //glIndexi(BLUE_INDEX);
-   glColor3ub(0, 255, 127);
-   glCallList(GLOBE);
-
-   //glIndexi(GREEN_INDEX);
-   glColor3ub(255, 0, 127);
-   glTranslatef(0.8F, -0.65F, 0.0F);
-   glRotatef(30.0F, 1.0F, 0.5F, 1.0F);
-   glCallList(CYLINDER);
-
-   SWAPBUFFERS;
-}
