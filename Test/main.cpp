@@ -79,8 +79,8 @@ public:
 
       //glIndexi(GREEN_INDEX);
       glColor3ub(255, 0, 127);
-      glTranslatef(0.8F, -0.65F, 0.0F);
-      glRotatef(30.0F, 1.0F, 0.5F, 1.0F);
+      glRotatef(30.0F, 1.0F, 1.0F, 1.0F);
+      glTranslatef(0.8F, -0.65F, 1.0F);
       glCallList(GLuint(PrimitiveIndex::CYLINDER));
 
       SwapBuffers(m_hdc);
@@ -255,18 +255,14 @@ private:
       quadObj = gluNewQuadric();
       gluQuadricDrawStyle(quadObj, GLU_LINE);
       gluQuadricNormals(quadObj, GLU_SMOOTH);
-      gluCylinder(quadObj, 0.3, 0.0, 0.6, 15, 10);
+      gluCylinder(quadObj, 0.3, 0.5, 0.6, 15, 10);
       glEndList();
 
       glNewList(GLuint(PrimitiveIndex::CYLINDER), GL_COMPILE);
-      glPushMatrix();
-      glRotatef((GLfloat)90.0, (GLfloat)1.0, (GLfloat)0.0, (GLfloat)0.0);
-      glTranslatef((GLfloat)0.0, (GLfloat)0.0, (GLfloat)-1.0);
       quadObj = gluNewQuadric();
       gluQuadricDrawStyle(quadObj, GLU_LINE);
       gluQuadricNormals(quadObj, GLU_SMOOTH);
-      gluCylinder(quadObj, 0.3, 0.3, 0.6, 12, 4);
-      glPopMatrix();
+      gluCylinder(quadObj, 0.3, 0.5, 0.6, 12, 4);
       glEndList();
    }
 
