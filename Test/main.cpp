@@ -2,6 +2,7 @@
 
 #include <rgdk/math.hpp>
 #include <rgdk/scope_exit.hpp>
+#include <rgdk/type_info.hpp>
 
 #include <windows.h> 
 #include <GL/gl.h> 
@@ -9,8 +10,6 @@
 
 #include <cmath>
 #include <iostream>
-
-const char* const application_name = "Win OpenGL";
 
 class OpenGLTestWindow
 {
@@ -33,16 +32,16 @@ public:
       static WindowClass windowClass;
 
       CreateWindow(
-         application_name,
+         m_class_name.c_str(),
          "Generic OpenGL Sample",
          WS_OVERLAPPED,
          CW_USEDEFAULT,
          CW_USEDEFAULT,
          800,
          600,
-         NULL,
-         NULL,
-         NULL,
+         nullptr,
+         nullptr,
+         nullptr,
          this);
 
       ShowWindow(m_hWnd, SW_SHOWNORMAL);
@@ -93,19 +92,19 @@ private:
    public:
       WindowClass()
       {
-         WNDCLASSEX wndclass{};
+         WNDCLASSEX wndclass { };
 
          wndclass.cbSize = sizeof(WNDCLASSEX);
          wndclass.style = 0;
          wndclass.lpfnWndProc = MainWndProc;
          wndclass.cbClsExtra = 0;
          wndclass.cbWndExtra = 0;
-         wndclass.hInstance = NULL;
-         wndclass.hIcon = LoadIcon(NULL, application_name);
-         wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
+         wndclass.hInstance = nullptr;
+         wndclass.hIcon = nullptr; //LoadIcon(nullptr, application_name);
+         wndclass.hCursor = LoadCursor(nullptr, IDC_ARROW);
          wndclass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-         wndclass.lpszMenuName = application_name;
-         wndclass.lpszClassName = application_name;
+         wndclass.lpszMenuName = nullptr;
+         wndclass.lpszClassName = m_class_name.c_str();
 
          if (!RegisterClassEx(&wndclass))
             throw std::exception();
@@ -113,8 +112,8 @@ private:
 
       ~WindowClass()
       {
-         std::cout << "Unregistering class: " << application_name << std::endl;
-         UnregisterClass(application_name, NULL);
+         std::cout << "Unregistering class: " << m_class_name.c_str() << std::endl;
+         UnregisterClass(m_class_name.c_str(), nullptr);
       }
    };
 
@@ -292,6 +291,8 @@ private:
    }
 
 private:
+   static const std::string m_class_name;
+
    HWND m_hWnd;
    HDC   m_hdc;
    HGLRC m_hrc;
@@ -302,17 +303,24 @@ private:
    GLdouble m_radius;
 };
 
+const std::string OpenGLTestWindow::m_class_name = rgdk::type_name<OpenGLTestWindow>();
+
 int main()
 {
-   OpenGLTestWindow window;
-   window.create();
+   PRINT(rgdk::type_name<OpenGLTestWindow>().c_str());
+
+   OpenGLTestWindow windows[1];
+   for (auto&& window : windows)
+   {
+      window.create();
+   }
 
    for (;;)
    {
       MSG msg{};
-      while (PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE))
+      while (PeekMessage(&msg, nullptr, 0, 0, PM_NOREMOVE))
       {
-         if (GetMessage(&msg, NULL, 0, 0))
+         if (GetMessage(&msg, nullptr, 0, 0))
          {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
@@ -322,7 +330,10 @@ int main()
             return TRUE;
          }
       }
-      window.draw(GetTickCount());
+      for (auto&& window : windows)
+      {
+         window.draw(GetTickCount());
+      }
       Sleep(5);
    }
 }
