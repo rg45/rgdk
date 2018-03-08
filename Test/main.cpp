@@ -11,8 +11,11 @@
 #include <cmath>
 #include <iostream>
 
+
+
 namespace OpenGLTest
 {
+
 class OpenGLTestWindow
 {
 public:
@@ -54,33 +57,30 @@ public:
    GLvoid draw(DWORD msek)
    {
       msek += m_phase;
-
-      wglMakeCurrent(m_hdc, m_hrc);
-      rgdk::scope_exit atExit = []() { wglMakeCurrent(nullptr, nullptr); };
-
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-      glPushMatrix();
-      rgdk::scope_exit restoreMatrix = glPopMatrix;
-
       auto twist = 360.f * (msek % 10000) / 10000;
       auto latitude = 15.f + 30.f * std::sin(2 * rgdk::math::pi<float> * (msek % 7000) / 7000);
       auto longitude = -360.f * (msek % 3000) / 3000;
 
-      polarView(twist, latitude, longitude);
+      wglMakeCurrent(m_hdc, m_hrc);
+      rgdk::scope_exit resetContext = []() { wglMakeCurrent(nullptr, nullptr); };
 
-      //glIndexi(RED_INDEX);
-      glColor3ub(255, 127, 0);
+      glMatrixMode(GL_MODELVIEW);
+      glPushMatrix();
+      rgdk::scope_exit restoreMatrix = glPopMatrix;
+
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glTranslated(0.0, 0.0, -m_radius);
+      glRotated(-90.f, 1.0, 0.0, 0.0);
+      glRotated(twist, 0.0, 0.0, 1.0);
+      glRotated(latitude, 1.0, 0.0, 0.0);
+      glRotated(longitude, 0.0, 0.0, 1.0);
+
       glCallList(GLuint(PrimitiveIndex::CONE));
 
-      //glIndexi(BLUE_INDEX);
-      glColor3ub(0, 255, 127);
       glCallList(GLuint(PrimitiveIndex::GLOBE));
 
-      //glIndexi(GREEN_INDEX);
-      glColor3ub(255, 0, 127);
-      glRotatef(30.0F, 1.0F, 1.0F, 1.0F);
-      glTranslatef(0.8F, -0.65F, 1.0F);
+      glRotated(longitude, 1.0, 1.0, 1.0);
+      glTranslated(0.8, -0.65, 1.0);
       glCallList(GLuint(PrimitiveIndex::CYLINDER));
 
       SwapBuffers(m_hdc);
@@ -238,16 +238,18 @@ private:
       glMatrixMode(GL_PROJECTION);
       glLoadIdentity();
       gluPerspective(m_fov, GLfloat(width) / height, m_near_plane, m_far_plane);
-      glMatrixMode(GL_MODELVIEW);
    }
 
    GLvoid createObjects()
    {
       GLUquadricObj *quadObj;
 
+      glMatrixMode(GL_MODELVIEW);
+
       glNewList(GLuint(PrimitiveIndex::GLOBE), GL_COMPILE);
       quadObj = gluNewQuadric();
       gluQuadricDrawStyle(quadObj, GLU_LINE);
+      glColor3ub(255, 127, 0);
       gluSphere(quadObj, 1.5, 16, 16);
       glEndList();
 
@@ -255,6 +257,7 @@ private:
       quadObj = gluNewQuadric();
       gluQuadricDrawStyle(quadObj, GLU_LINE);
       gluQuadricNormals(quadObj, GLU_SMOOTH);
+      glColor3ub(255, 0, 127);
       gluCylinder(quadObj, 0.3, 0.5, 0.6, 15, 10);
       glEndList();
 
@@ -262,6 +265,7 @@ private:
       quadObj = gluNewQuadric();
       gluQuadricDrawStyle(quadObj, GLU_LINE);
       gluQuadricNormals(quadObj, GLU_SMOOTH);
+      glColor3ub(127, 255, 0);
       gluCylinder(quadObj, 0.3, 0.5, 0.6, 12, 4);
       glEndList();
    }
@@ -276,17 +280,7 @@ private:
       glEnable(GL_DEPTH_TEST);
       glMatrixMode(GL_PROJECTION);
       gluPerspective(m_fov, GLdouble(width) / height, m_near_plane, m_far_plane);
-      glMatrixMode(GL_MODELVIEW);
       createObjects();
-   }
-
-   void polarView(GLdouble twist, GLdouble latitude, GLdouble longitude)
-   {
-      glTranslated(0.0, 0.0, -m_radius);
-      glRotated(-90.f, 1.0, 0.0, 0.0);
-      glRotated(twist, 0.0, 0.0, 1.0);
-      glRotated(latitude, 1.0, 0.0, 0.0);
-      glRotated(longitude, 0.0, 0.0, 1.0);
    }
 
 private:
