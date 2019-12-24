@@ -1,5 +1,7 @@
 #include "stdafx.h"
 
+#pragma warning(disable : 4820 4668 4625 4626 4571 5026 5027 5039 4365 4774 4710)
+
 #include <rgdk/math.hpp>
 #include <rgdk/scope_exit.hpp>
 #include <rgdk/type_info.hpp>
